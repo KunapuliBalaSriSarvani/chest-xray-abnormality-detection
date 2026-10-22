@@ -1,165 +1,129 @@
-from ultralytics import YOLO
-import cv2
+
+from pathlib import Path
 import os
+
+import cv2
 import numpy as np
-import hashlib
+from ultralytics import YOLO
 
-MODEL_PATH = "runs/detect/train10/weights/best.pt"
+# Resolve paths relative to this file, not the terminal's working directory.
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_PATH = BASE_DIR / "runs" / "detect" / "train10" / "weights" / "best.pt"
+RESULT_DIR = BASE_DIR / "static" / "results"
+RESULT_DIR.mkdir(parents=True, exist_ok=True)
 
-model = YOLO(MODEL_PATH)
+if not MODEL_PATH.exists():
+    raise FileNotFoundError(
+        f"Trained model not found at {MODEL_PATH}"
+    )
 
-RESULT_DIR = "static/results"
-os.makedirs(RESULT_DIR, exist_ok=True)
-
-CLASSES = [
-"Aortic Enlargement",
-"Atelectasis",
-"Calcification",
-"Cardiomegaly",
-"Lung Consolidation",
-"Interstitial Lung Disease",
-"Pulmonary Infiltration",
-"Lung Opacity",
-"Pulmonary Nodule / Mass",
-"Other Lung Lesion",
-"Pleural Effusion",
-"Pleural Thickening",
-"Pneumothorax",
-"Pulmonary Fibrosis"
-]
-
-COLOR_MAP = {
-"Aortic Enlargement": (0,0,255),          # red
-"Atelectasis": (0,255,0),                 # green
-"Calcification": (0,255,255),             # yellow
-"Cardiomegaly": (255,0,0),                # blue
-"Lung Consolidation": (255,0,255),        # magenta
-"Interstitial Lung Disease": (255,255,0), # cyan
-"Pulmonary Infiltration": (0,165,255),    # orange
-"Lung Opacity": (255,128,0),              # light blue
-"Pulmonary Nodule / Mass": (128,0,128),   # purple
-"Other Lung Lesion": (0,128,128),         # olive
-"Pleural Effusion": (128,255,0),          # light green
-"Pleural Thickening": (0,128,255),        # orange dark
-"Pneumothorax": (255,0,128),              # violet
-"Pulmonary Fibrosis": (128,128,0)         # teal
-}
-
-
-def image_hash(img):
-    """Generate deterministic hash from image pixels"""
-    return int(hashlib.md5(img.tobytes()).hexdigest(), 16)
+model = YOLO(str(MODEL_PATH))
 
 
 def generate_heatmap(img, boxes):
-
+    """Create a visualization of predicted regions, not a medical saliency map."""
     h, w = img.shape[:2]
-    mask = np.zeros((h,w), dtype=np.float32)
+    mask = np.zeros((h, w), dtype=np.float32)
 
-    for (x1,y1,x2,y2) in boxes:
+    for x1, y1, x2, y2 in boxes:
+        cv2.rectangle(mask, (x1, y1), (x2, y2), 1.0, thickness=-1)
 
-        cx = int((x1+x2)/2)
-        cy = int((y1+y2)/2)
+    if not boxes:
+        return img.copy()
 
-        radius = max(x2-x1,y2-y1)
+    # Smooth the box regions for display.
+    mask = cv2.GaussianBlur(mask, (0, 0), sigmaX=max(3, min(h, w) * 0.025))
+    max_value = float(mask.max())
 
-        for y in range(h):
-            for x in range(w):
+    if max_value > 0:
+        mask /= max_value
 
-                dist = ((x-cx)**2+(y-cy)**2)**0.5
-                value = np.exp(-(dist**2)/(2*(radius**2)))
-
-                mask[y,x]+=value
-
-    mask = mask / mask.max()
-
-    heat = cv2.applyColorMap((mask*255).astype(np.uint8), cv2.COLORMAP_JET)
-
-    heatmap = cv2.addWeighted(heat,0.4,img,0.6,0)
-
-    return heatmap
+    heat = cv2.applyColorMap(
+        (mask * 255).astype(np.uint8),
+        cv2.COLORMAP_JET
+    )
+    return cv2.addWeighted(img, 0.60, heat, 0.40, 0)
 
 
 def analyze_image(image_path):
+    """Run the trained YOLO model on an uploaded image."""
+    img = cv2.imread(str(image_path))
 
-    img = cv2.imread(image_path)
+    if img is None:
+        raise ValueError("The uploaded file could not be read as an image.")
+
+    # Run actual model inference.
+    prediction = model.predict(
+        source=img,
+        conf=0.25,
+        verbose=False
+    )[0]
 
     detected = img.copy()
+    findings = []
+    boxes_for_heatmap = []
 
-    findings=[]
-    boxes_for_heatmap=[]
+    if prediction.boxes is not None:
+        for box in prediction.boxes:
+            x1, y1, x2, y2 = map(
+                int, box.xyxy[0].cpu().tolist()
+            )
+            class_id = int(box.cls[0].item())
+            confidence = float(box.conf[0].item())
 
-    h,w = img.shape[:2]
+            label = prediction.names.get(
+                class_id, f"Class {class_id}"
+            )
 
-    # analyze brightness to vary output
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    mean_intensity = gray.mean()
+            # Keep coordinates inside the image.
+            h, w = img.shape[:2]
+            x1, x2 = max(0, x1), min(w - 1, x2)
+            y1, y2 = max(0, y1), min(h - 1, y2)
 
-    if mean_intensity > 150:
-        severity = "Normal"
-    elif mean_intensity > 140:
-        severity = "Mild"
-    elif mean_intensity > 110:
-        severity = "Moderate"
-    else:
-        severity = "Severe"
+            if x2 <= x1 or y2 <= y1:
+                continue
 
-    # choose abnormalities based on image statistics
-    class_index1 = int(mean_intensity) % len(CLASSES)
-    class_index2 = int(mean_intensity * 3) % len(CLASSES)
+            color = (0, 80, 255)
+            display_label = f"{label} {confidence:.0%}"
 
-    class1 = CLASSES[class_index1]
-    class2 = CLASSES[class_index2]
-
-
-    if severity == "Normal":
-
-        findings = ["No abnormalities detected"]
-        heatmap = img
-
-    else:
-
-        demo_boxes = [
-            (int(w*0.25),int(h*0.35),int(w*0.45),int(h*0.55)),
-            (int(w*0.55),int(h*0.30),int(w*0.75),int(h*0.50))
-        ]
-
-        labels = [class1, class2]
-
-        for i,(x1,y1,x2,y2) in enumerate(demo_boxes):
-
-            label = labels[i]
-
-            color = COLOR_MAP[label]
-
-            cv2.rectangle(detected,(x1,y1),(x2,y2),color,3)
-
+            cv2.rectangle(
+                detected, (x1, y1), (x2, y2), color, 2
+            )
             cv2.putText(
                 detected,
-                label,
-                (x1,y1-10),
+                display_label,
+                (x1, max(20, y1 - 8)),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
+                0.5,
                 color,
                 2
             )
 
-            findings.append(label)
+            findings.append(
+                f"{label} (confidence: {confidence:.1%})"
+            )
+            boxes_for_heatmap.append((x1, y1, x2, y2))
 
-            boxes_for_heatmap.append((x1,y1,x2,y2))
+    # Absence of detections does not establish that an X-ray is normal.
+    if findings:
+        status = "Model detections found"
+    else:
+        status = "No model detections"
 
-        heatmap = generate_heatmap(img,boxes_for_heatmap)
+    detected_path = RESULT_DIR / "detected.png"
+    heatmap_path = RESULT_DIR / "heatmap.png"
 
+    heatmap = generate_heatmap(img, boxes_for_heatmap)
 
-    detected_path=f"{RESULT_DIR}/detected.png"
-    heatmap_path=f"{RESULT_DIR}/heatmap.png"
+    if not cv2.imwrite(str(detected_path), detected):
+        raise OSError("Could not save the detection visualization.")
 
-    cv2.imwrite(detected_path,detected)
-    cv2.imwrite(heatmap_path,heatmap)
+    if not cv2.imwrite(str(heatmap_path), heatmap):
+        raise OSError("Could not save the region visualization.")
 
     return {
-        "severity":severity,
-        "findings":findings,
-        "detected_image":detected_path,
-        "heatmap_image":heatmap_path
+        "severity": status,
+        "findings": findings or ["No detections returned by the model"],
+        "detected_image": str(detected_path.relative_to(BASE_DIR)).replace("\\", "/"),
+        "heatmap_image": str(heatmap_path.relative_to(BASE_DIR)).replace("\\", "/")
     }
