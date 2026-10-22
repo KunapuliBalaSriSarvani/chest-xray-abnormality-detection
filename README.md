@@ -66,6 +66,25 @@ Example output showing the application's displayed results for a case categorize
 The application provides a downloadable report containing patient-label information, predicted abnormalities, visualizations, and the displayed severity level.
 <img width="592" height="852" alt="image" src="https://github.com/user-attachments/assets/3efd9fc2-6a2a-4a1f-9d3b-004b1f2bd41e" />
 
+## 🌐 Live Deployment
+
+**Live Application:** [Chest X-ray Abnormality Detection System](https://chest-xray-abnormality-detection-1.onrender.com)
+
+The application is deployed on **Render** and provides a web interface for uploading chest X-ray images, viewing application-generated results and visualizations, and downloading PDF reports.
+
+### Access the Application
+
+1. Open the live application using the link above.
+2. Enter a patient label and upload a chest X-ray image.
+3. Submit the image to view the application's output.
+4. Review the displayed visualizations and download the PDF report.
+
+**Deployment Platform:** Render  
+**Source Code:** [GitHub Repository](https://github.com/KunapuliBalaSriSarvani/chest-xray-abnormality-detection)
+
+> **Note:** This is an experimental academic prototype. Displayed severity levels, bounding boxes, and heatmaps are not clinically validated and should not be used for medical decisions.
+
+
 
 ## ⚙️ Application Workflow
 
