@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Diagnostic Report</title>
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f4f6f9;
+        }
+
+        .report-card {
+            background: #ffffff;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .section-title {
+            font-weight: 600;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+
+        .xray-img{
+height:300px;
+object-fit:contain;
+background:black;
+}
+
+        .severity-badge {
+            font-size: 1rem;
+            padding: 8px 14px;
+            border-radius: 20px;
+        }
+
+        .legend span {
+            font-weight: bold;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container my-5">
+
+    <div class="report-card">
+
+        <!-- Header -->
+        <h2 class="text-center mb-4">AI Diagnostic Report</h2>
+
+        <!-- Patient & Severity -->
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>Patient:</strong> {{ patient }}</p>
+            </div>
+            <div class="col-md-6 text-md-end">
+                <strong>Severity:</strong>
+                {% if severity == "Normal" %}
+                    <span class="badge bg-success severity-badge">{{ severity }}</span>
+                {% elif severity == "Mild" %}
+                    <span class="badge bg-warning text-dark severity-badge">{{ severity }}</span>
+                {% elif severity == "Moderate" %}
+    <span class="badge bg-warning severity-badge">{{ severity }}</span>
+                {% else %}
+                    <span class="badge bg-danger severity-badge">{{ severity }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Findings -->
+        <h5 class="section-title">Detected Abnormalities</h5>
+        <ul>
+            {% for f in findings %}
+                <li>{{ f }}</li>
+            {% endfor %}
+        </ul>
+
+        <!-- Images -->
+        <h5 class="section-title">Radiology Visualization</h5>
+
+        <div class="row text-center">
+
+            <div class="col-md-4">
+                <h6>Original X-ray</h6>
+                <img src="{{ original }}" class="img-fluid xray-img mt-2">
+            </div>
+
+            <div class="col-md-4">
+                <h6>Detected Regions</h6>
+                <img src="{{ detected }}" class="img-fluid xray-img mt-2">
+            </div>
+
+            <div class="col-md-4">
+                <h6>Explainability Heatmap</h6>
+                <img src="{{ heatmap }}" class="img-fluid xray-img mt-2">
+            </div>
+
+        </div>
+
+        <!-- Legend -->
+    <h5 class="section-title">Legend</h5>
+
+<ul class="legend">
+
+<li><span style="color:#ff0000;">■</span> Aortic Enlargement</li>
+<li><span style="color:#00ff00;">■</span> Atelectasis</li>
+<li><span style="color:#ffff00;">■</span> Calcification</li>
+<li><span style="color:#0000ff;">■</span> Cardiomegaly</li>
+<li><span style="color:#ff00ff;">■</span> Lung Consolidation</li>
+<li><span style="color:#00ffff;">■</span> Interstitial Lung Disease</li>
+<li><span style="color:#ffa500;">■</span> Pulmonary Infiltration</li>
+<li><span style="color:#0080ff;">■</span> Lung Opacity</li>
+<li><span style="color:#800080;">■</span> Pulmonary Nodule / Mass</li>
+<li><span style="color:#808000;">■</span> Other Lung Lesion</li>
+<li><span style="color:#00ff80;">■</span> Pleural Effusion</li>
+<li><span style="color:#ff8000;">■</span> Pleural Thickening</li>
+<li><span style="color:#8000ff;">■</span> Pneumothorax</li>
+<li><span style="color:#008080;">■</span> Pulmonary Fibrosis</li>
+
+</ul>
+        <!-- Actions -->
+        <div class="mt-4 d-flex gap-3">
+            <a href="/download" class="btn btn-success">
+                Download PDF Report
+            </a>
+
+            <a href="/" class="btn btn-secondary">
+                New Scan
+            </a>
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
